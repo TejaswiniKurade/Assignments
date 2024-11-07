@@ -1,0 +1,618 @@
+//------------------------------FIBONACCI ASS-1--------------------------------
+int recursive(int n) {
+    if (n <= 1) {
+        return n;
+    }
+    return recursive(n - 1) + recursive(n - 2);
+}
+
+int iterative(int n) {
+    if (n <= 1) {
+        return n;
+    }
+
+    int prev1 = 0, prev2 = 1;
+    int result;
+
+    for (int i = 2; i <= n; ++i) {
+        result = prev1 + prev2;
+        prev1 = prev2;
+        prev2 = result;
+    }
+
+    return result;
+}
+
+//------------------------------huffman---------------------
+struct Node {
+    char ch;
+    int freq;
+    Node *left, *right;
+
+    Node(char character, int frequency) : ch(character), freq(frequency), left(nullptr), right(nullptr) {}
+};
+
+struct Compare {
+    bool operator()(Node* left, Node* right) {
+        if (left->freq == right->freq) {
+            return left->ch > right->ch;
+        }
+        return left->freq > right->freq;
+    }
+};
+
+void printCodes(Node* root, string str) {
+    if (!root) return;
+    if (!root->left && !root->right) {
+        cout << root->ch << ": " << str << endl;
+    }
+    printCodes(root->left, str + "0");
+    printCodes(root->right, str + "1");
+}
+
+// Function to build the Huffman Tree and print the codes
+void buildHuffmanTree(const unordered_map<char, int>& freqMap) {
+    priority_queue<Node*, vector<Node*>, Compare> minHeap;
+    for (auto pair : freqMap) {
+        minHeap.push(new Node(pair.first, pair.second));
+    }
+
+    // Construct the Huffman Tree by repeatedly merging nodes with the lowest frequency
+    while (minHeap.size() != 1) {
+        Node* left = minHeap.top(); minHeap.pop();
+        Node* right = minHeap.top(); minHeap.pop();
+
+        // Create a new internal node with combined frequency and add it to the heap
+        Node* newNode = new Node('\0', left->freq + right->freq);
+        newNode->left = left;
+        newNode->right = right;
+        minHeap.push(newNode);
+    }
+    Node* root = minHeap.top();
+    cout << "Huffman Codes:\n";
+    printCodes(root, "");
+}
+
+
+//------------------------------fractional knapsack---------------------
+
+struct Item {
+    int weight;
+    int value;
+};
+
+// Comparator function to sort items by value-to-weight ratio in descending order
+bool compare(Item a, Item b) {
+    double r1 = (double)a.value / a.weight;
+    double r2 = (double)b.value / b.weight;
+    return r1 > r2;
+}
+
+// Function to calculate maximum profit for the fractional knapsack
+void fractionalKnapsack(int W, vector<Item> items) {
+    sort(items.begin(), items.end(), compare);
+
+    int currentWeight = 0; // Current weight of knapsack
+    double maxProfit = 0.0; // Resulting profit
+
+    int n=items.size();
+    for (int i=0;i<n;i++) {
+        // If adding the entire item doesn't exceed capacity
+        if (currentWeight + items[i].weight <= W) {
+            currentWeight += items[i].weight;
+            maxProfit += items[i].value;
+        } else {
+            // Take the fraction of the last item that fits in the knapsack
+            int remainingWeight = W - currentWeight;
+            maxProfit +=  remainingWeight* ((double)items[i].value / items[i].weight);
+            break;
+        }
+    }
+    cout<<maxProfit;
+}
+
+int main() {
+    int n, W;
+    cout << "Enter the number of items: ";
+    cin >> n;
+    cout << "Enter the capacity of the knapsack: ";
+    cin >> W;
+
+    vector<Item> items(n);
+    cout << "Enter the weight and value of each item:\n";
+    for (int i = 0; i < n; i++) {
+        cout << "Item " << i + 1 << ": ";
+        cin >> items[i].weight >> items[i].value;
+    }
+
+    
+    cout << "Maximum profit in fractional knapsack: ";
+    fractionalKnapsack(W, items);
+    return 0;
+}
+
+
+//------------------------------knapsack 1/0---------------------
+
+int func_memo(vector<int>& wt, vector<int>& val, int ind, int W, vector<vector<int>>& dp) {
+    // Base case: If there are no items left or the knapsack has no capacity, return 0
+    if (ind == 0 || W == 0) {
+        return 0;
+    }
+
+    // If the result for this state is already calculated, return it
+    if (dp[ind][W] != -1) {
+        return dp[ind][W];
+    }
+
+    // Calculate the maximum value by either excluding the current item or including it
+    int notTaken = func_memo(wt, val, ind - 1, W, dp);
+    int taken = 0;
+
+    // Check if the current item can be included without exceeding the knapsack's capacity
+    if (wt[ind] <= W) {
+        taken = val[ind] + func_memo(wt, val, ind - 1, W - wt[ind], dp);
+    }
+
+    // Store the result in the DP table and return
+    return dp[ind][W] = max(notTaken, taken);
+}
+
+// Function to solve the 0/1 Knapsack problem
+int knapsack(vector<int>& wt, vector<int>& val, int n, int W) {
+    vector<vector<int>> dp(n, vector<int>(W + 1, -1));
+    return func_memo(wt, val, n - 1, W, dp);
+}
+int knapsack_tab(vector<int>& wt, vector<int>& val, int n, int W) {
+    vector<vector<int>> dp1(n, vector<int>(W + 1, 0));
+    
+    for (int i = wt[0]; i <= W; i++) {
+        dp1[0][i] = val[0];
+    }
+    
+    for (int ind = 1; ind < n; ind++) {
+        for (int cap = 0; cap <= W; cap++) {
+            // Calculate the maximum value by either excluding the current item or including it
+            int notTaken = dp1[ind - 1][cap];
+            int taken = INT_MIN;
+
+            // Check if the current item can be included without exceeding the knapsack's capacity
+            if (wt[ind] <= cap) {
+                taken = val[ind] + dp1[ind - 1][cap - wt[ind]];
+            }
+            dp1[ind][cap] = max(notTaken, taken);
+        }  
+    }
+    return dp1[n - 1][W];
+}
+int main() {
+    int n=3, W=5;
+    // cout << "Enter the number of items: ";
+    // cin >> n;
+    // cout << "Enter the capacity of the knapsack: ";
+    // cin >> W;
+
+    vector<int> weights(n), values(n);
+    cout << "Enter the weight and value of each item:\n";
+    for (int i = 0; i < n; i++) {
+        cin >> weights[i] >> values[i];
+    }
+
+    int maxProfit = knapsack_tab(weights, values, n,W);
+    cout << "Maximum profit in 0-1 knapsack (DP): " << maxProfit << endl;
+
+    return 0;
+}
+
+//--------------------------n-queen---------------------
+
+void printBoard(const vector<vector<int>>& board, int n) {
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < n; j++) {
+            cout << board[i][j] << " ";
+        }
+        cout << endl;
+    }
+}
+
+// Function to check if placing a queen is safe
+bool isSafe(const vector<vector<int>>& board, int row, int col, int n) {
+    for (int i = 0; i < col; i++) {
+        if (board[row][i] == 1) return false;
+    }
+    for (int i = row, j = col; i >= 0 && j >= 0; i--, j--) {
+        if (board[i][j] == 1) return false;
+    }
+    for (int i = row, j = col; i < n && j >= 0; i++, j--) {
+        if (board[i][j] == 1) return false;
+    }
+    return true;
+}
+
+// Recursive function to place queens
+bool solveNQueens(vector<vector<int>>& board, int col, int n) {
+    if (col >= n) return true;
+
+    // Try placing queen in each row of the current column
+    for (int i = 0; i < n; i++) {
+        if (isSafe(board, i, col, n)) {
+            board[i][col] = 1;  // Place queen
+
+            // Recur to place the next queen
+            if (solveNQueens(board, col + 1, n)) return true;
+
+            // Backtrack: Remove the queen if it leads to a dead end
+            board[i][col] = 0;
+        }
+    }
+
+    return false; // No place found for the current queen
+}
+
+// Function to place the first queen
+bool placeInitialQueen(vector<vector<int>>& board, int row, int n) {
+    board[row][0] = 1;
+    return solveNQueens(board, 1, n);
+}
+
+int main() {
+    int n;
+    cout << "Enter the value of N (for an N x N board): ";
+    cin >> n;
+
+    vector<vector<int>> board(n, vector<int>(n, 0));
+    int initialRow;
+    cout << "Enter the row to place the first queen (0 to " << n - 1 << "): ";
+    cin >> initialRow;
+
+    if (placeInitialQueen(board, initialRow, n)) {
+        cout << "N-Queens solution:\n";
+        printBoard(board, n);
+    } else {
+        cout << "No solution exists for the given placement of the first queen.\n";
+    }
+
+    return 0;
+}
+
+
+//------------------------------job scheduling---------------------
+
+
+// Define a structure to represent a job
+struct Job {
+    int id;        // Job ID
+    int deadline;  // Deadline of job
+    int profit;    // Profit if job is completed before or on the deadline
+};
+
+// Comparator function to sort jobs in decreasing order of profit
+bool compare(Job a, Job b) {
+    return a.profit > b.profit;
+}
+
+// Function to find the maximum profit job sequence
+void jobSequencing(vector<Job> &jobs, int n) {
+    // Sort all jobs according to decreasing order of profit
+    sort(jobs.begin(), jobs.end(), compare);
+
+    // Array to store the result of the job sequence (job IDs)
+    vector<int> result(n, -1);
+
+    // Keep track of free time slots
+    vector<bool> slot(n, false);
+
+    // Maximum profit accumulated
+    int maxProfit = 0;
+
+    // Iterate over all jobs
+    for (int i = 0; i < jobs.size(); i++) {
+        // Find a free slot for this job (starting from its deadline)
+        for (int j = min(n, jobs[i].deadline) - 1; j >= 0; j--) {
+            // If a free slot is found
+            if (!slot[j]) {
+                result[j] = jobs[i].id;   // Assign job ID to the slot
+                slot[j] = true;           // Mark the slot as occupied
+                maxProfit += jobs[i].profit; // Accumulate profit
+                break;
+            }
+        }
+    }
+
+    // Display the selected jobs and the maximum profit
+    cout << "Selected job sequence: ";
+    for (int i = 0; i < n; i++) {
+        if (result[i] != -1)
+            cout <<"--> "<< "Job" << result[i] << " ";
+    }
+    cout << "\nMaximum Profit: " << maxProfit << endl;
+}
+
+int main() {
+    int n; // Number of jobs
+    cout << "Enter the number of jobs: ";
+    cin >> n;
+
+    vector<Job> jobs(n);
+    cout << "Enter job details (id, deadline, profit):\n";
+    for (int i = 0; i < n; i++) {
+        cout << "Job " << i + 1 << ": ";
+        cin >> jobs[i].id >> jobs[i].deadline >> jobs[i].profit;
+    }
+
+    // Find the maximum number of slots available (maximum deadline)
+    int maxDeadline = 0;
+    for (int i = 0; i < n; i++) {
+        if (jobs[i].deadline > maxDeadline)
+            maxDeadline = jobs[i].deadline;
+    }
+
+    // Call the job sequencing function
+    jobSequencing(jobs, maxDeadline);
+
+    return 0;
+}
+
+//------------------------------quicksort---------------------
+
+// Partition function for deterministic quicksort
+int deterministicPartition(int arr[], int low, int high) {
+    int pivot = arr[high]; // Choose the last element as pivot
+    int i = low - 1;       // Index of the smaller element
+
+    for (int j = low; j <= high - 1; j++) {
+        // If the current element is smaller than the pivot
+        if (arr[j] < pivot) {
+            i++;
+            swap(arr[i], arr[j]);
+        }
+    }
+    swap(arr[i + 1], arr[high]); // Place the pivot in its correct position
+    return i + 1;                // Return the partition index
+}
+
+// Deterministic QuickSort function
+void deterministicQuickSort(int arr[], int low, int high) {
+    if (low < high) {
+        int pi = deterministicPartition(arr, low, high);
+
+        // Recursively sort the sub-arrays
+        deterministicQuickSort(arr, low, pi - 1);
+        deterministicQuickSort(arr, pi + 1, high);
+    }
+}
+
+
+
+
+
+// Partition function for randomized quicksort
+int randomizedPartition(int arr[], int low, int high) {
+    // Generate a random index between low and high
+    int randomPivotIndex = low + rand() % (high - low + 1);
+
+    // Swap the randomly chosen pivot with the last element
+    swap(arr[randomPivotIndex], arr[high]);
+
+    // Proceed with the usual partitioning logic
+    return deterministicPartition(arr, low, high);
+}
+
+// Randomized QuickSort function
+void randomizedQuickSort(int arr[], int low, int high) {
+    if (low < high) {
+        int pi = randomizedPartition(arr, low, high);
+
+        // Recursively sort the sub-arrays
+        randomizedQuickSort(arr, low, pi - 1);
+        randomizedQuickSort(arr, pi + 1, high);
+    }
+}
+
+// Function to print an array
+void printArray(int arr[], int size) {
+    for (int i = 0; i < size; i++) {
+        cout << arr[i] << " ";
+    }
+    cout << endl;
+}
+
+
+
+int main() {
+    srand(time(0)); // Seed for the random number generator
+
+    // Sample array
+    int arr[] = {10, 7, 8, 9, 1, 5, 2, 3};
+    int n = sizeof(arr) / sizeof(arr[0]);
+
+    cout << "Original Array: ";
+    printArray(arr, n);
+
+    // Compare deterministic and randomized QuickSort
+
+    deterministicQuickSort(arr,0,n-1);
+    printArray(arr,n);
+
+    randomizedQuickSort(arr,0,n-1);
+    printArray(arr,n);
+
+    return 0;
+}
+//---------------------------binomial coefficient---------------------------
+
+// Function to calculate binomial coefficient C(n, k) using DP
+int binomialCoefficient(int n, int k) {
+    // Create a 2D vector to store binomial coefficients
+    vector<vector<int>> C(n + 1, vector<int>(k + 1, 0));
+
+    // Fill the DP table
+    for (int i = 0; i <= n; i++) {
+        for (int j = 0; j <= min(i, k); j++) {
+            // Base case: C(n, 0) = C(n, n) = 1
+            if (j == 0 || j == i)
+                C[i][j] = 1;
+            else
+                // Use the recurrence relation
+                C[i][j] = C[i - 1][j - 1] + C[i - 1][j];
+        }
+    }
+
+    // Return the result C(n, k)
+    return C[n][k];
+}
+
+int main() {
+    int n, k;
+    cout << "Enter n: ";
+    cin >> n;
+    cout << "Enter k: ";
+    cin >> k;
+
+    int result = binomialCoefficient(n, k);
+    cout << "Binomial Coefficient C(" << n << ", " << k << ") = " << result << endl;
+
+    return 0;
+}
+
+
+
+//------------------------------Bank contract---------------------------
+
+pragma solidity >= 0.7.0;
+// Write  a  smart  contract  on  a  test  network,  for  Bank  account  of  a  customer  for
+  // following operations: Deposit money | Withdraw Money | Show balance
+contract Bank{
+    mapping(address => uint) public user_account;
+    mapping(address => bool) public user_exist;
+
+    function create_account() public payable returns(string memory){
+        require(user_exist[msg.sender] == false, "Account Already created!");
+        user_account[msg.sender] = msg.value;
+        user_exist[msg.sender] = true;
+        return "Account created";
+    }
+
+    function deposit(uint amount) public payable returns(string memory){
+        require(user_exist[msg.sender] == true, "Account not created!");
+        require(amount > 0, "Amount should be greater than 0");
+        user_account[msg.sender] += amount;
+        return "Amount deposisted sucessfully";
+    }
+
+    function withdraw(uint amount) public payable returns(string memory){
+        require(user_exist[msg.sender] == true, "Account not created!");
+        require(amount > 0, "Amount should be greater than 0");
+        require(user_account[msg.sender] >= amount, "Amount is greater than money deposisted");
+        user_account[msg.sender] -= amount;
+        return "Amount withdrawn sucessfully";    
+    }
+
+    function account_balance() public view returns(uint){
+        return user_account[msg.sender];
+    }
+    
+    function account_exists() public view returns(bool){
+        return user_exist[msg.sender];
+    }
+
+}
+
+
+//---------------------------Vote Contract---------------------------
+
+// SPDX-License-Identifier: MIT
+
+pragma solidity ^0.5.16;
+// Command Line Help
+// ctrl+d to exit console.
+//web3.eth.getAccounts()
+//web3.eth.getAccounts().then(function(acc) (account - acc})
+contract Election{
+    //Model a Candidate ID, Name and Vote Count
+    struct Candidate {
+        uint id;
+        string name;
+        uint voteCount;
+    }
+    // Store accounts that have voted
+    mapping (address => bool) public voters;
+
+    // Store candidate
+    // Fetch candidate using mapping key/value pair
+    mapping(uint => Candidate) public candidates;
+    // Store Candidates Count this will be an index
+    uint public candidatesCount;
+    event votedEvent (
+        uint indexed candidateId
+    );
+    // Constructor initialize state variables
+    constructor() public {
+    // Initialize candidate names
+        addCandidate("Candidate 1");
+        addCandidate("Candidate 2");
+    }
+
+    function addCandidate(string memory _name) private {
+    // Increment vote count
+    candidatesCount++;
+    // create mapping
+    candidates[candidatesCount] = Candidate(candidatesCount, _name, 0);
+    }
+    // Voting function
+    function vote (uint _candidateId) public {
+    // require that they have not voted before the voter account doesn't already exist in mapping
+    require(!voters[msg.sender]);
+
+    // require a valid candidate
+    require(_candidateId > 0 && _candidateId <= candidatesCount);
+
+    // record that voter has voted
+    voters[msg.sender] = true;
+
+    // update candidate vote count
+    candidates[_candidateId].voteCount++;
+
+    // trigger voted event
+    emit votedEvent(_candidateId);
+    }
+}
+
+
+
+//---------------------------student contract---------------------------
+
+// SPDX-License-Identifier: MIT
+pragma solidity >= 0.7.0;
+
+contract Student_management{
+
+    struct Student{
+        int stud_id;
+        string Name;
+        string Department;
+    }
+
+    Student[] Students;
+
+    function add_stud(int stud_id, string memory Name, string memory Department) public{
+        Student memory stud = Student(stud_id, Name, Department);
+        Students.push(stud);
+    }
+
+    function getStudent(int stud_id) public view returns(string memory, string memory){
+        for(uint i = 0; i < Students.length; i++){
+            Student memory stud = Students[i];
+            if(stud.stud_id == stud_id){
+                return(stud.Name, stud.Department);
+            }
+        }
+        return("Name Not Found", "Department Not Found");
+    }
+
+    //Fallback Function
+    fallback() external payable{
+        Students.push(Student(7, "XYZ", "Mechanical"));
+    }
+}
+

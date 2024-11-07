@@ -1,0 +1,719 @@
+//--------------------------ASS-1 UBER--------------------------
+
+import numpy as np
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LinearRegression, ElasticNet
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import mean_squared_error, r2_score
+import xgboost as xgb
+import statsmodels.api as sm
+
+df = pd.read_csv('uber.csv')
+print(df.columns)
+df.info()
+
+df.drop(['Unnamed: 0','key'],axis =1,inplace = True)
+df.fillna(method='ffill', inplace=True)
+df.drop(df[df['fare_amount'].values<=0].index,inplace=True)
+df.drop(df[df['passenger_count']>10].index,inplace=True)
+df['pickup_datetime'] = pd.to_datetime(df['pickup_datetime'])
+df['day_of_week'] = df['pickup_datetime'].dt.dayofweek
+df.dropna(inplace=True)
+sns.boxplot(x=df["fare_amount"])
+plt.show()
+
+# Ensure no other invalid values like NaN are present in the dataset
+df = df.replace([np.inf, -np.inf], np.nan)
+
+df['dropoff_latitude'].fillna(value=df['dropoff_latitude'].mean(),inplace = True)
+df['dropoff_longitude'].fillna(value=df['dropoff_longitude'].median(),inplace = True)
+df = df[
+    (df['pickup_latitude'] >= -90) & (df['pickup_latitude'] <= 90) &
+    (df['dropoff_latitude'] >= -90) & (df['dropoff_latitude'] <= 90) &
+    (df['pickup_longitude'] >= -180) & (df['pickup_longitude'] <= 180) &
+    (df['dropoff_longitude'] >= -180) & (df['dropoff_longitude'] <= 180)
+]
+
+# Calculate the IQR for the 'fare_amount' column
+Q1 = df["fare_amount"].quantile(0.25)
+Q3 = df["fare_amount"].quantile(0.75)
+IQR = Q3 - Q1
+# Define a threshold (e.g., 1.5 times the IQR) to identify outliers
+threshold = 1.5
+lower_bound = Q1 - threshold * IQR
+upper_bound = Q3 + threshold * IQR
+# Remove outliers
+data_no_outliers = df[(df["fare_amount"] >= lower_bound) & (df["fare_amount"] <= upper_bound)]
+# Visualize the 'fare_amount' distribution without outliers
+sns.boxplot(x=data_no_outliers["fare_amount"])
+plt.show()
+
+df_for_corr = df.drop(columns=[ 'pickup_datetime'])
+correlation_matrix = df_for_corr.corr()
+sns.heatmap(correlation_matrix, annot=True)
+plt.show()
+
+X = df[['pickup_longitude', 'pickup_latitude', 'dropoff_longitude', 'dropoff_latitude', 'passenger_count']]
+y = df['fare_amount']  
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+results = {}
+
+linear_model = LinearRegression()
+linear_model.fit(X_train, y_train)
+y_pred_lr = linear_model.predict(X_test)
+results['Linear Regression'] = {
+    'R2': r2_score(y_test, y_pred_lr),
+    'MSE': mean_squared_error(y_test, y_pred_lr),
+    'RMSE': np.sqrt(mean_squared_error(y_test, y_pred_lr))
+}
+
+rf_model = RandomForestRegressor()
+rf_model.fit(X_train, y_train)
+y_pred_rf = rf_model.predict(X_test)
+results['Random Forest'] = {
+   'R2': r2_score(y_test, y_pred_rf),
+   'MSE': mean_squared_error(y_test, y_pred_rf),
+   'RMSE': np.sqrt(mean_squared_error(y_test, y_pred_rf))
+}
+
+xgb_model = xgb.XGBRegressor()
+xgb_model.fit(X_train, y_train)
+y_pred_xgb = xgb_model.predict(X_test)
+results['XGB Regressor'] = {
+    'R2': r2_score(y_test, y_pred_xgb),
+    'MSE': mean_squared_error(y_test, y_pred_xgb),
+    'RMSE': np.sqrt(mean_squared_error(y_test, y_pred_xgb))
+}
+
+elastic_net = ElasticNet()
+elastic_net.fit(X_train, y_train)
+y_pred_en = elastic_net.predict(X_test)
+results['Elastic Net'] = {
+    'R2': r2_score(y_test, y_pred_en),
+    'MSE': mean_squared_error(y_test, y_pred_en),
+    'RMSE': np.sqrt(mean_squared_error(y_test, y_pred_en))
+}
+
+poisson_model = sm.GLM(y_train, X_train, family=sm.families.Poisson()).fit()
+y_pred_poisson = poisson_model.predict(X_test)
+results['Poisson Regression'] = {
+    'R2': r2_score(y_test, y_pred_poisson),
+    'MSE': mean_squared_error(y_test, y_pred_poisson),
+    'RMSE': np.sqrt(mean_squared_error(y_test, y_pred_poisson))
+}
+
+results_df = pd.DataFrame(results).T
+print(results_df)
+
+plt.figure(figsize=(12, 6))
+plt.plot(results_df.index, results_df['R2'], label='R2 Score', marker='o')
+plt.plot(results_df.index, results_df['MSE'], label='MSE', marker='o')
+plt.plot(results_df.index, results_df['RMSE'], label='RMSE', marker='o')
+plt.title('Model Comparison')
+plt.xlabel('Model')
+plt.ylabel('Score')
+plt.legend()
+plt.grid(True)
+plt.show()
+
+
+//-------------------------------ASS 2 emails---------------------------
+
+import pandas as pd
+import seaborn as sns
+from sklearn.model_selection import train_test_split
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.svm import SVC
+from sklearn.metrics import accuracy_score, classification_report
+from sklearn.preprocessing import StandardScaler
+from sklearn.naive_bayes import GaussianNB
+import matplotlib.pyplot as plt
+
+df = pd.read_csv("emails.csv")
+df.describe()
+
+df.drop(['Email No.'],axis=1, inplace=True)
+df.fillna(df.mean(), inplace=True)
+#Exploratory Data Analysis (EDA)
+print(df['to'].value_counts())
+
+scaler = StandardScaler()
+scaled_features = scaler.fit_transform(df.drop('the', axis=1)) 
+# Assuming 'Prediction' column is the one with non spam labels
+non_spam_emails = df[df['Prediction'] == 1]  # Filter out non spam emails where Prediction == 1
+# Drop the 'Prediction' column to focus on word columns only
+non_spam_emails_words = non_spam_emails.drop(columns=['Prediction'])
+# Sum up the word frequencies across all spam emails
+word_frequencies = non_spam_emails_words.sum(axis=0)
+# Get the top 10 most frequent words
+top_10_words = word_frequencies.nlargest(30)
+# Plot the top 10 words and their frequencies
+plt.bar(top_10_words.index, top_10_words.values)
+plt.title('Most Frequent Words in Non Spam Emails')
+plt.xticks(rotation=45)
+plt.ylabel('Frequency')
+plt.show()
+
+# Assuming 'Prediction' column is the one with spam labels
+spam_emails = df[df['Prediction'] == 0]  # Filter out spam emails where Prediction == 0
+# Drop the 'Prediction' column to focus on word columns only
+spam_emails_words = spam_emails.drop(columns=['Prediction'])
+# Sum up the word frequencies across all spam emails
+word_frequencies = spam_emails_words.sum(axis=0)
+# Get the top 10 most frequent words
+top_10_words = word_frequencies.nlargest(30)
+plt.bar(top_10_words.index, top_10_words.values)
+plt.title('Most Frequent Words in Spam Emails')
+plt.xticks(rotation=45)
+plt.ylabel('Frequency')
+plt.show()
+
+word_data = df.drop(columns=['Prediction'])
+word_frequencies = word_data.sum(axis=0)
+top_20_words = word_frequencies.nlargest(20).index
+top_20_word_data = word_data[top_20_words]
+correlation_matrix = top_20_word_data.corr()
+plt.figure(figsize=(10, 8))
+sns.heatmap(correlation_matrix, cmap='coolwarm', annot=False, linewidths=0.5)
+plt.title('Correlation Matrix for Top 20 Frequent Words')
+plt.show()
+
+df['Prediction'] = df['Prediction'].replace({0:'Not spam', 1:'Spam'})
+
+X = df.drop("Prediction", axis=1)  # Features
+y = df["Prediction"]  # Target variable
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=1)
+knn_pred = knn.predict(X_test)
+svm_pred = svm.predict(X_test)
+nb_pred = nb.predict(X_test)
+knn_accuracy = accuracy_score(y_test, knn_pred)
+svm_accuracy = accuracy_score(y_test, svm_pred)
+nb_accuracy = accuracy_score(y_test, nb_pred)
+print(f'KNN Accuracy: {knn_accuracy:.2f}')
+print(f'SVM Accuracy: {svm_accuracy:.2f}')
+print(f'Naive Bayes Accuracy: {nb_accuracy:.2f}')
+
+knn_report = classification_report(y_test, knn_pred)
+svm_report = classification_report(y_test, svm_pred)
+nb_report = classification_report(y_test, nb_pred)
+print("K-Nearest Neighbors Classification Report:")
+print(knn_report)
+print("SVM Classification Report:")
+print(svm_report)
+print("NB Neighbors Classification Report:")
+print(nb_report)
+
+model_names = ['KNN', 'SVM', 'Naive Bayes']
+accuracies = [knn_accuracy, svm_accuracy, nb_accuracy]
+plt.bar(model_names, accuracies)
+plt.ylabel('Accuracy')
+plt.title('Model Accuracy Comparison')
+plt.ylim(0, 1)
+plt.show()
+
+//-----------------------------ASS 3  BANK CHURNING MODEL-------------------------
+
+import numpy as np
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler, LabelEncoder
+from sklearn.metrics import accuracy_score, confusion_matrix, roc_curve, auc, classification_report
+import tensorflow as tf
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense
+
+data = pd.read_csv('Churn_Modelling.csv')
+
+# Feature and Target separation
+X = data.drop(columns=['Exited', 'CustomerId', 'Surname'])
+y = data['Exited']
+# Encode categorical features
+label_encoder = LabelEncoder()
+X['Geography'] = label_encoder.fit_transform(X['Geography'])
+X['Gender'] = label_encoder.fit_transform(X['Gender'])
+# Train-Test Split
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+# Normalize the data
+scaler = StandardScaler()
+X_train = scaler.fit_transform(X_train)
+X_test = scaler.transform(X_test)
+
+
+# Initialize the neural network
+model = Sequential()
+# Adding the input layer and first hidden layer
+model.add(Dense(16, activation='relu', input_shape=(X_train.shape[1],)))
+# Adding second hidden layer
+model.add(Dense(8, activation='relu'))
+# Adding output layer
+model.add(Dense(1, activation='sigmoid'))
+# Compile the model
+model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+# Train the model
+history = model.fit(X_train, y_train, epochs=50, batch_size=32, validation_split=0.2)
+# Model Evaluation
+y_pred = (model.predict(X_test) > 0.5).astype(int)
+accuracy = accuracy_score(y_test, y_pred)
+print(f'Accuracy: {accuracy}')
+
+
+# Confusion Matrix
+conf_matrix = confusion_matrix(y_test, y_pred)
+print('Confusion Matrix:')
+print(conf_matrix)
+# ROC and AUC
+fpr, tpr, _ = roc_curve(y_test, y_pred)
+roc_auc = auc(fpr, tpr)
+plt.figure()
+plt.plot(fpr, tpr, color='blue', lw=2, label=f'ROC curve (area = {roc_auc:.2f})')
+plt.plot([0, 1], [0, 1], color='gray', lw=2, linestyle='--')
+plt.xlim([0.0, 1.0])
+plt.ylim([0.0, 1.05])
+plt.xlabel('False Positive Rate')
+plt.ylabel('True Positive Rate')
+plt.title('Receiver Operating Characteristic')
+plt.legend(loc='lower right')
+plt.show()
+
+
+
+
+#i) Plot gender vs credit card ownership, active members vs churn, and country-wise distribution
+
+# Check data types and handle missing values
+data = data.dropna(subset=['Gender'])  # Ensure no missing values in Gender
+data['Gender'] = data['Gender'].astype('category')
+data['HasCrCard'] = data['HasCrCard'].replace({0: 'No', 1: 'Yes'}).astype('category')
+data['Exited'] = data['Exited'].replace({0: 'No', 1: 'Yes'}).astype('category')
+
+
+# Set the visual style
+sns.set(style="whitegrid")
+
+# 1. Gender vs Credit Card Ownership
+plt.figure(figsize=(10, 6))
+sns.countplot(x='Gender', hue='HasCrCard', data=data)
+plt.title('Gender vs Credit Card Ownership')
+plt.xlabel('Gender')
+plt.ylabel('Number of Customers')
+plt.legend(title='Has Credit Card', labels=['No', 'Yes'])
+plt.show()
+
+# 2. Active Members vs Churn
+plt.figure(figsize=(10, 6))
+sns.countplot(x='IsActiveMember', hue='Exited', data=data)
+plt.title('Active Members vs Churn')
+plt.xlabel('Is Active Member')
+plt.ylabel('Number of Customers')
+plt.legend(title='Exited', labels=['No Churn', 'Churn'])
+plt.show()
+
+# 3. Country-wise Distribution
+plt.figure(figsize=(12, 8))
+sns.countplot(x='Geography', data=data, order=data['Geography'].value_counts().index)
+plt.title('Country-wise Distribution of Customers')
+plt.xlabel('Number of Customers')
+plt.ylabel('Country')
+plt.show()
+
+
+print(data.info())  # This will show data types and any missing values
+
+# Handle missing values in Gender and convert types
+data = data.dropna(subset=['Gender'])  # Remove rows with NaN in Gender
+data['Gender'] = data['Gender'].astype('category')
+data['HasCrCard'] = data['HasCrCard'].astype('category')
+
+# Verify the data before plotting
+print(data.head())  # Inspect first few rows
+print(data.columns)  # List all columns
+
+# Check dimensions of the data
+print(data.shape) 
+
+
+
+#ii
+
+# Observed Balance Density Plot
+sns.kdeplot(data['Balance'], shade=True)
+plt.title('Density Plot of Balance')
+plt.show()
+
+# Owned Products Density Plot
+sns.kdeplot(data['NumOfProducts'], shade=True)
+plt.title('Density Plot of Products Owned')
+plt.show()
+
+# Credit Score Density Plot
+sns.kdeplot(data['CreditScore'], shade=True)
+plt.title('Density Plot of Credit Score')
+plt.show()
+
+# Tenure Density Plot
+sns.kdeplot(data['Tenure'], shade=True)
+plt.title('Density Plot of Tenure')
+plt.show()
+
+
+
+#iii
+
+# Scatter plot of Credit Score vs Age
+plt.scatter(data['CreditScore'], data['Age'], alpha=0.5)
+plt.title('Customer Distribution by Credit Score and Age')
+plt.xlabel('Credit Score')
+plt.ylabel('Age')
+plt.show()
+
+
+#iv
+
+# Correlation Matrix
+# Encode categorical variables to numeric
+label_encoder = LabelEncoder()
+data['Gender'] = label_encoder.fit_transform(data['Gender'])  # Female = 0, Male = 1
+data['HasCrCard'] = label_encoder.fit_transform(data['HasCrCard'])  # No = 0, Yes = 1
+data['Exited'] = label_encoder.fit_transform(data['Exited'])  # No Churn = 0, Churn = 1
+
+# Calculate correlation matrix
+
+
+numeric_data = data.select_dtypes(include=['int64', 'float64'])
+corr_matrix = numeric_data.corr()
+# Plot the heatmap
+plt.figure(figsize=(12, 8))
+sns.heatmap(corr_matrix, annot=True, cmap='coolwarm', fmt=".2f")
+plt.title('Correlation Matrix of Attributes')
+plt.show()
+
+
+## Comparison with Other ML Algorithms
+
+
+#i Random Forest
+from sklearn.ensemble import RandomForestClassifier
+rf = RandomForestClassifier(n_estimators=100, random_state=42)
+rf.fit(X_train, y_train)
+y_pred_rf = rf.predict(X_test)
+accuracy_rf = accuracy_score(y_test, y_pred_rf)
+print(f'Random Forest Accuracy: {accuracy_rf}')
+
+
+# KNN Algorithm
+from sklearn.neighbors import KNeighborsClassifier
+knn = KNeighborsClassifier(n_neighbors=5)
+knn.fit(X_train, y_train)
+y_pred_knn = knn.predict(X_test)
+accuracy_knn = accuracy_score(y_test, y_pred_knn)
+print(f'KNN Accuracy: {accuracy_knn}')
+
+
+
+#Logistic Regression
+
+from sklearn.linear_model import LogisticRegression
+log_reg = LogisticRegression(random_state=42)
+log_reg.fit(X_train, y_train)
+y_pred_lr = log_reg.predict(X_test)
+accuracy_lr = accuracy_score(y_test, y_pred_lr)
+print(f'Logistic Regression Accuracy: {accuracy_lr}')
+
+
+
+#Support Vector Machine
+from sklearn.svm import SVC
+svm = SVC(kernel='linear')
+svm.fit(X_train, y_train)
+y_pred_svm = svm.predict(X_test)
+accuracy_svm = accuracy_score(y_test, y_pred_svm)
+print(f'SVM Accuracy: {accuracy_svm}')
+
+
+#xgboost
+
+from xgboost import XGBClassifier
+xgb = XGBClassifier()
+xgb.fit(X_train, y_train)
+y_pred_xgb = xgb.predict(X_test)
+accuracy_xgb = accuracy_score(y_test, y_pred_xgb)
+print(f'XGBoost Accuracy: {accuracy_xgb}')
+
+
+#naive_bayes
+
+from sklearn.naive_bayes import GaussianNB
+nb = GaussianNB()
+nb.fit(X_train, y_train)
+y_pred_nb = nb.predict(X_test)
+accuracy_nb = accuracy_score(y_test, y_pred_nb)
+print(f'Naïve Bayes Accuracy: {accuracy_nb}')
+
+
+#Linear Discriminant Analysis (LDA) and Quadratic Discriminant Analysis (QDA)
+
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis, QuadraticDiscriminantAnalysis
+
+# LDA
+lda = LinearDiscriminantAnalysis()
+lda.fit(X_train, y_train)
+y_pred_lda = lda.predict(X_test)
+accuracy_lda = accuracy_score(y_test, y_pred_lda)
+print(f'LDA Accuracy: {accuracy_lda}')
+
+# QDA
+qda = QuadraticDiscriminantAnalysis()
+qda.fit(X_train, y_train)
+y_pred_qda = qda.predict(X_test)
+accuracy_qda = accuracy_score(y_test, y_pred_qda)
+print(f'QDA Accuracy: {accuracy_qda}')
+
+
+# Define the models to evaluate
+models = {
+    "Random Forest": RandomForestClassifier(),
+    "KNN": KNeighborsClassifier(),
+    "Logistic Regression": LogisticRegression(max_iter=200),
+    "SVM": SVC(probability=True),
+    "XGBoost": XGBClassifier(use_label_encoder=False, eval_metric='logloss'),
+    "Naive Bayes": GaussianNB(),
+    "LDA": LinearDiscriminantAnalysis(),
+    "QDA": QuadraticDiscriminantAnalysis()
+}
+
+# Store performance metrics
+results = {}
+
+# Train and evaluate each model
+for name, model in models.items():
+    model.fit(X_train, y_train)
+    y_pred = model.predict(X_test)
+    y_pred_proba = model.predict_proba(X_test)[:, 1]  # Get probabilities for ROC AUC
+    
+    accuracy = accuracy_score(y_test, y_pred)
+    cm = confusion_matrix(y_test, y_pred)
+    fpr, tpr, thresholds = roc_curve(y_test, y_pred_proba)
+    roc_auc = auc(fpr, tpr)
+    
+    results[name] = {
+        "Accuracy": accuracy,
+        "Confusion Matrix": cm,
+        "ROC AUC": roc_auc
+    }
+
+# Print the results
+results_df = pd.DataFrame(results).T
+print(results_df)
+
+# Plot ROC Curve for all models
+plt.figure(figsize=(10, 8))
+for name, model in models.items():
+    model.fit(X_train, y_train)
+    y_pred_proba = model.predict_proba(X_test)[:, 1]
+    fpr, tpr, _ = roc_curve(y_test, y_pred_proba)
+    plt.plot(fpr, tpr, label=f'{name} (AUC = {auc(fpr, tpr):.2f})')
+
+plt.plot([0, 1], [0, 1], 'k--')
+plt.xlabel('False Positive Rate')
+plt.ylabel('True Positive Rate')
+plt.title('ROC Curve')
+plt.legend(loc='lower right')
+plt.show()
+
+
+//---------------------------ASS 4 ------------------------
+
+import numpy as np  # Import NumPy
+import matplotlib.pyplot as plt  # Import Matplotlib
+
+def function(x):
+    return (x + 3) ** 2
+
+def gradient(x):
+    return 2 * (x + 3)
+
+# Initialize Parameters
+cur_x = 2  # Starting point
+rate = 0.01  # Learning rate
+precision = 0.000001  # Precision for stopping
+previous_step_size = 1  # Difference between iterations (initial value)
+
+max_iters = 1000  # Maximum iterations
+iters = 0  # Iteration counter
+
+
+x_history = [cur_x]
+y_history = [function(cur_x)]
+
+# Run Gradient Descent
+while previous_step_size > precision and iters < max_iters:
+    prev_x = cur_x
+    cur_x -= rate * gradient(prev_x)  # Update x by moving against the gradient
+    previous_step_size = abs(prev_x - cur_x)  # Calculate the step size
+    iters += 1  # Increment iteration counter
+    x_history.append(cur_x)  # Track the history of x values
+    y_history.append(function(cur_x))  # Track the corresponding y values
+print("Local Minima Occurs at x:", cur_x)
+print("Minimum value of the function:", function(cur_x))
+
+
+
+x_vals = np.linspace(-6, 3, 100)  # Generate 100 points between -6 and 3
+y_vals = function(x_vals)  # Get the function values for the generated points
+
+# Plot the function and the gradient descent steps
+plt.figure(figsize=(10,6))
+plt.plot(x_vals, y_vals, label='y = (x + 3)²')  # Plot the function curve
+plt.scatter(x_history, y_history, color='red', label='Gradient Descent Steps', zorder=5)  # Plot steps
+plt.title('Gradient Descent for Finding Local Minima')
+plt.xlabel('x')
+plt.ylabel('y')
+plt.legend()
+plt.grid(True)
+plt.show()
+
+
+
+//----------------------------ASS 5----------------------------------
+
+import pandas as pd
+import seaborn as sns
+from sklearn.model_selection import train_test_split
+import os 
+from sklearn.metrics import accuracy_score, confusion_matrix, roc_curve, roc_auc_score
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.naive_bayes import GaussianNB
+from sklearn.svm import SVC
+from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier, GradientBoostingClassifier
+from sklearn.linear_model import LogisticRegression
+from xgboost import XGBClassifier
+from sklearn.preprocessing import StandardScaler
+import matplotlib.pyplot as plt
+
+df = pd.read_csv('diabetes.csv')
+sns.heatmap(df.isnull(), cbar=False)
+df_corr = df.corr()
+df.keys
+corr_target = abs(df_corr['Outcome'])
+features = corr_target[corr_target >= 0.10]
+features = features.keys()
+features
+
+X = df[features]
+X = X.drop("Outcome", axis=1)
+y = df['Outcome']
+X_train , X_test , y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+accuracys = []
+recalls = []
+precisions = []
+f1_scores = []
+errors = []
+cf_matrix = []
+fpers = []
+tpers = []
+
+def process(clf, X_train=X_train, X_test=X_test, y_train=y_train, y_test=y_test):
+clf.fit(X_train, y_train)
+y_pred = clf.predict(X_test)
+
+accuracy = accuracy_score(y_test, y_pred)
+confusion = confusion_matrix(y_test, y_pred)
+error_rate = 1 - accuracy
+precision = confusion[0][0] / (confusion[0][0] + confusion[1][0]) * 100
+recall = confusion[0][0] / (confusion[0][0] + confusion[0][1]) * 100
+f1_score = ((2 * precision * recall) / (precision + recall)) / 100
+
+# ROC curve
+probs = clf.predict_proba(X_test)[:, 1]  # Probabilities for ROC curve
+fper, tper, _ = roc_curve(y_test, probs)
+
+# Append results to respective lists
+fpers.append(fper)
+tpers.append(tper)
+accuracys.append(accuracy)
+recalls.append(recall)
+precisions.append(precision)
+f1_scores.append(f1_score)
+errors.append(error_rate)
+cf_matrix.append(confusion)
+cf_matrix.append(confusion)
+
+
+algo = [
+    KNeighborsClassifier(n_neighbors=3),
+    DecisionTreeClassifier(),
+    GaussianNB(),  # Updated to GaussianNB
+    SVC(gamma=0.01, probability=True),
+    RandomForestClassifier(),
+    AdaBoostClassifier(),
+    GradientBoostingClassifier(),
+    LogisticRegression(),  # Added Logistic Regression
+    XGBClassifier()  # Added XGBoost
+]
+
+# Names of algorithms
+algos = [
+    "KNN",
+    "Decision Tree",
+    "Naive Bayes",
+    "SVM",
+    "Random Forest",
+    "AdaBoost",
+    "Gradient Boosting",
+    "Logistic Regression",  # Added Logistic Regression
+    "XGBoost"  # Added XGBoost
+]
+
+
+for clf in algo:
+process(clf)
+Metric = pd.DataFrame({
+    'Algorithm': algos,
+    "Error rate": errors,
+    'Accuracy': accuracys,
+    'Recall': recalls,
+    'Precision': precisions,
+    'F1_score': f1_scores
+})
+Metric
+
+for i in range(len(algos)):
+ax = plt.axes()
+sns.heatmap(cf_matrix[i], annot=True, ax=ax)
+# sns.heatmap(data, ax = ax)
+ax.set_title(algos[i])
+plt.show()
+
+
+plt.plot(fpers[0], tpers[0], linestyle='--')
+# plt.plot(fpr, rf_tpr, marker='.', label='Random Forest (AUROC = %0.3f)' % rf_auc)
+# plt.plot(nb_fpr, nb_tpr, marker='.', label='Naive Bayes (AUROC = %0.3f)' % nb_auc)
+
+# Title
+plt.title('ROC Plot')
+# Axis labels
+plt.xlabel('False Positive Rate')
+plt.ylabel('True Positive Rate')
+# Show legend
+plt.legend()
+# Show plot
+plt.show()
+
+
+
+# Plot ROC curves
+for i in range(len(fpers)):
+    plt.plot(fpers[i], tpers[i], linestyle='--', label=algos[i])
+
+plt.title('ROC Plot')
+plt.xlabel('False Positive Rate')
+plt.ylabel('True Positive Rate')
+plt.legend()
